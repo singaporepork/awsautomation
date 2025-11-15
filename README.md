@@ -103,9 +103,11 @@ See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation,
 
 ### AMI and Snapshot Cleanup
 
-**File**: `cleanup-old-amis-snapshots.sh`
+**Files**:
+- `cleanup-old-amis-snapshots.sh` - Bash script for Linux/macOS
+- `cleanup-old-amis-snapshots.ps1` - PowerShell script for Windows
 
-Bash script to identify and cleanup Amazon Machine Images (AMIs) older than a specified age threshold and their associated EBS snapshots. This helps reduce storage costs and maintain a clean AWS environment.
+Scripts to identify and cleanup Amazon Machine Images (AMIs) older than a specified age threshold and their associated EBS snapshots. This helps reduce storage costs and maintain a clean AWS environment.
 
 **Features**:
 - Identifies AMIs older than specified age (default: 180 days)
@@ -119,11 +121,14 @@ Bash script to identify and cleanup Amazon Machine Images (AMIs) older than a sp
 
 **Prerequisites**:
 - AWS CLI installed and configured
-- jq for JSON parsing: `sudo apt-get install jq` or `brew install jq`
+- **Bash version**: jq for JSON parsing: `sudo apt-get install jq` or `brew install jq`
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
 - AWS credentials configured
 - EC2 permissions (describe-images, deregister-image, delete-snapshot)
 
 **Quick Start**:
+
+Bash (Linux/macOS):
 ```bash
 # Dry run - identify old AMIs without removing them (default)
 DRY_RUN=true ./cleanup-old-amis-snapshots.sh
@@ -138,12 +143,36 @@ AWS_REGION=us-west-2 AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
 AWS_REGION=eu-west-1 DRY_RUN=true ./cleanup-old-amis-snapshots.sh
 ```
 
+PowerShell (Windows):
+```powershell
+# Dry run - identify old AMIs without removing them
+.\cleanup-old-amis-snapshots.ps1 -DryRun
+
+# Cleanup old AMIs and snapshots in default region (us-east-1)
+.\cleanup-old-amis-snapshots.ps1
+
+# Cleanup in specific region with custom age threshold
+.\cleanup-old-amis-snapshots.ps1 -Region us-west-2 -AgeDays 90
+
+# Preview what would be cleaned up in production region
+.\cleanup-old-amis-snapshots.ps1 -Region eu-west-1 -DryRun
+```
+
 **Configuration Options**:
+
+Bash:
 - **AWS_REGION**: Target region (default: us-east-1)
 - **AGE_DAYS**: Age threshold in days (default: 180)
 - **DRY_RUN**: Preview mode without making changes (default: true)
 
+PowerShell:
+- **-Region**: Target region (default: us-east-1)
+- **-AgeDays**: Age threshold in days (default: 180)
+- **-DryRun**: Switch to enable preview mode
+
 **Common Use Cases**:
+
+Bash:
 ```bash
 # Monthly cleanup of AMIs older than 180 days
 DRY_RUN=false AWS_REGION=us-east-1 ./cleanup-old-amis-snapshots.sh
@@ -163,6 +192,26 @@ done
 AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
 ```
 
+PowerShell:
+```powershell
+# Monthly cleanup of AMIs older than 180 days
+.\cleanup-old-amis-snapshots.ps1 -Region us-east-1
+
+# Review old AMIs before cleanup
+.\cleanup-old-amis-snapshots.ps1 -DryRun
+# Review old-amis-cleanup.csv
+.\cleanup-old-amis-snapshots.ps1
+
+# Cleanup across multiple regions
+@('us-east-1', 'us-west-2', 'eu-west-1') | ForEach-Object {
+    Write-Host "Cleaning up region: $_"
+    .\cleanup-old-amis-snapshots.ps1 -Region $_
+}
+
+# Aggressive cleanup (90 days)
+.\cleanup-old-amis-snapshots.ps1 -AgeDays 90
+```
+
 **Cost Savings**:
 - AMI storage is billed based on snapshot storage costs
 - EBS snapshots cost $0.05 per GB-month (standard)
@@ -170,7 +219,9 @@ AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
 - 50 old AMIs × $60/year = **$3,000/year in storage savings**
 
 **Safety Features**:
-- Dry run mode by default (must explicitly set `DRY_RUN=false`)
+- Dry run mode available for safe preview
+  - Bash: Default is true (must explicitly set `DRY_RUN=false`)
+  - PowerShell: Use `-DryRun` switch to enable
 - Only processes AMIs owned by your account
 - Age verification before deletion
 - Detailed logging of all operations
@@ -250,8 +301,10 @@ Run with DRY_RUN=false to actually deregister AMIs and delete snapshots.
 ```
 
 **Integration Examples**:
+
+Bash (Cron jobs):
 ```bash
-# Monthly cleanup job (cron) - dry run for review
+# Monthly cleanup job - dry run for review
 0 0 1 * * /usr/local/bin/cleanup-old-amis-snapshots.sh
 
 # Quarterly aggressive cleanup
@@ -265,6 +318,22 @@ DRY_RUN=false ./cleanup-old-amis-snapshots.sh
 # Multi-region with different thresholds
 AWS_REGION=us-east-1 AGE_DAYS=365 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
 AWS_REGION=us-west-2 AGE_DAYS=180 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+```
+
+PowerShell (Scheduled tasks):
+```powershell
+# Monthly cleanup job via Task Scheduler
+# Create scheduled task that runs:
+powershell.exe -File "C:\Scripts\cleanup-old-amis-snapshots.ps1" -DryRun
+
+# Pre-deployment cleanup with approval
+.\cleanup-old-amis-snapshots.ps1 -DryRun | Out-File review.txt
+# Review review.txt and approve
+.\cleanup-old-amis-snapshots.ps1
+
+# Multi-region with different thresholds
+.\cleanup-old-amis-snapshots.ps1 -Region us-east-1 -AgeDays 365
+.\cleanup-old-amis-snapshots.ps1 -Region us-west-2 -AgeDays 180
 ```
 
 **Important Notes**:
