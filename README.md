@@ -5,6 +5,7 @@ This repository contains tools and Infrastructure as Code (IaC) for AWS security
 ## Contents
 
 - **[IAM Audit Scripts](#iam-audit-scripts)**: Bash and PowerShell scripts for auditing IAM security configurations
+- **[Network Security Scripts](#network-security-scripts)**: Scripts for network security and public exposure analysis
 - **[Python Scripts](#python-scripts)**: Python tools for exporting and analyzing security data
 - **[Terraform Modules](#terraform-modules)**: Infrastructure as Code for deploying AWS security services
 
@@ -99,6 +100,79 @@ done
 ```
 
 See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation, including advanced filtering, integration examples, and troubleshooting.
+
+---
+
+## Network Security Scripts
+
+### Public IP Resources Inventory
+
+**File**: `find-public-ip-resources.sh`
+
+Comprehensive shell script to identify all AWS resources with public IP addresses across all VPCs in all regions.
+
+**Resource Types Detected**:
+- EC2 instances with public IPs
+- NAT Gateways
+- Elastic IPs (associated and unassociated)
+- Load Balancers (Classic, ALB, NLB - internet-facing)
+- RDS instances (publicly accessible)
+- Network Interfaces with public IPs
+
+**Features**:
+- Scans all AWS regions automatically
+- Generates CSV, JSON, and text report outputs
+- Provides summary statistics by region, VPC, and resource type
+- Color-coded console output with progress updates
+- Identifies cost-saving opportunities (unassociated EIPs)
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- jq (recommended for full functionality)
+- Read-only AWS permissions for EC2, ELB, RDS
+
+**Quick Start**:
+```bash
+# Run the inventory scan
+./find-public-ip-resources.sh
+
+# Review outputs
+cat public-ip-resources.csv              # CSV format
+cat public-ip-resources.json             # JSON format
+cat public-ip-resources-report.txt       # Human-readable report
+```
+
+**Common Use Cases**:
+```bash
+# Find unassociated Elastic IPs (cost savings)
+grep "Elastic IP" public-ip-resources.csv | grep "Unassociated"
+
+# List all public EC2 instances
+grep "EC2 Instance" public-ip-resources.csv
+
+# Resources in specific VPC
+grep "vpc-12345" public-ip-resources.csv
+
+# Resources in production environment
+grep "Production" public-ip-resources.csv
+
+# Extract with jq
+jq -r '.resources[] | select(.resource_type == "RDS Instance")' public-ip-resources.json
+```
+
+**Security Benefits**:
+- Identify all publicly exposed resources for security audits
+- Ensure compliance with security policies
+- Find unauthorized public resources
+- Support incident response investigations
+- Minimize attack surface by identifying unnecessary public IPs
+
+**Output Files**:
+- `public-ip-resources.csv` - Spreadsheet-compatible format
+- `public-ip-resources.json` - Machine-readable with metadata
+- `public-ip-resources-report.txt` - Summary report with statistics
+
+See [PUBLIC-IP-INVENTORY.md](PUBLIC-IP-INVENTORY.md) for complete documentation, including detailed examples, integration patterns, and analysis techniques.
 
 ---
 
