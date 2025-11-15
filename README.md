@@ -6,6 +6,7 @@ This repository contains tools and Infrastructure as Code (IaC) for AWS security
 
 - **[IAM Audit Scripts](#iam-audit-scripts)**: Bash and PowerShell scripts for auditing IAM security configurations
 - **[Network Security Scripts](#network-security-scripts)**: Scripts for network security and public exposure analysis
+- **[RDS Management Scripts](#rds-pending-actions-report)**: Scripts for RDS database maintenance and monitoring
 - **[Python Scripts](#python-scripts)**: Python tools for exporting and analyzing security data
 - **[Terraform Modules](#terraform-modules)**: Infrastructure as Code for deploying AWS security services
 
@@ -343,6 +344,243 @@ powershell.exe -File "C:\Scripts\cleanup-old-amis-snapshots.ps1" -DryRun
 - Use tags to mark AMIs that should be retained
 - The script only processes AMIs owned by your account (not shared or public AMIs)
 - Snapshots are only deleted if they were associated with the deregistered AMI
+
+---
+
+### RDS Pending Actions Report
+
+**Files**:
+- `list-rds-pending-actions.sh` - Bash script for Linux/macOS
+- `list-rds-pending-actions.ps1` - PowerShell script for Windows
+
+Scripts to identify RDS database instances with pending maintenance actions or pending modifications across all AWS regions. Helps proactively manage database maintenance windows and track configuration changes.
+
+**Features**:
+- Scans all AWS regions automatically
+- Identifies pending maintenance actions (OS updates, engine upgrades, etc.)
+- Detects pending modifications (instance class changes, storage changes, etc.)
+- CSV and summary text file outputs
+- Color-coded console output for quick review
+- Detailed reporting of maintenance windows and auto-apply dates
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- **Bash version**: jq recommended (script works without it but provides better output with jq)
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
+- AWS credentials configured
+- RDS permissions (describe-db-instances, describe-pending-maintenance-actions)
+
+**Quick Start**:
+
+Bash (Linux/macOS):
+```bash
+# Run the report
+./list-rds-pending-actions.sh
+
+# Review outputs
+cat rds-pending-actions.csv              # CSV format
+cat rds-pending-actions-summary.txt      # Summary report
+```
+
+PowerShell (Windows):
+```powershell
+# Run the report
+.\list-rds-pending-actions.ps1
+
+# Review outputs
+Get-Content rds-pending-actions.csv           # CSV format
+Get-Content rds-pending-actions-summary.txt   # Summary report
+```
+
+**Output Example**:
+```
+==========================================
+RDS Pending Actions Report
+==========================================
+
+AWS Account ID: 123456789012
+Report Date: 2024-11-15
+
+Fetching AWS regions...
+Found 16 regions to check
+
+Checking region: us-east-1
+  Found 5 RDS instance(s)
+
+  DB Instance: production-db-01
+    Engine: postgres 14.7
+    Class: db.r5.xlarge
+    Status: available
+    Pending Maintenance:
+      system-update (auto-apply: 2024-11-20T04:00:00Z, opt-in: required)
+    Pending Modifications:
+      DBInstanceClass=db.r5.2xlarge; AllocatedStorage=500
+
+  ✓ staging-db-01 - No pending actions
+  ✓ dev-db-01 - No pending actions
+
+Checking region: us-west-2
+  Found 3 RDS instance(s)
+  ✓ analytics-db - No pending actions
+  ✓ reporting-db - No pending actions
+
+SUMMARY
+==========================================
+Total regions checked: 16
+Total RDS instances: 8
+
+Instances with pending actions: 1
+Instances with pending maintenance: 1
+Instances with pending modifications: 1
+
+Output files:
+  Summary: rds-pending-actions-summary.txt
+  CSV:     rds-pending-actions.csv
+```
+
+**Required AWS Permissions**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances",
+        "rds:DescribePendingMaintenanceActions",
+        "ec2:DescribeRegions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Common Use Cases**:
+
+Bash:
+```bash
+# Weekly maintenance planning report
+./list-rds-pending-actions.sh > weekly-rds-report.txt
+
+# Extract instances with pending maintenance
+grep -v "None" rds-pending-actions.csv | grep -v "^Region"
+
+# Filter by specific region
+grep "us-east-1" rds-pending-actions.csv
+
+# Automated reporting
+./list-rds-pending-actions.sh && \
+  mail -s "RDS Pending Actions Report" admin@company.com < rds-pending-actions-summary.txt
+```
+
+PowerShell:
+```powershell
+# Weekly maintenance planning report
+.\list-rds-pending-actions.ps1 | Out-File weekly-rds-report.txt
+
+# Extract instances with pending maintenance
+Import-Csv rds-pending-actions.csv | Where-Object { $_.'Pending Maintenance' -ne 'None' }
+
+# Filter by specific region
+Import-Csv rds-pending-actions.csv | Where-Object { $_.Region -eq 'us-east-1' }
+
+# Email the report
+.\list-rds-pending-actions.ps1
+Send-MailMessage -To "admin@company.com" `
+  -Subject "RDS Pending Actions Report" `
+  -Body (Get-Content rds-pending-actions-summary.txt | Out-String) `
+  -SmtpServer "smtp.company.com"
+```
+
+**Integration Examples**:
+
+Bash (Cron jobs):
+```bash
+# Daily morning report (8 AM)
+0 8 * * * /usr/local/bin/list-rds-pending-actions.sh
+
+# Weekly summary (Monday 9 AM)
+0 9 * * 1 /usr/local/bin/list-rds-pending-actions.sh && \
+  mail -s "Weekly RDS Maintenance Report" team@company.com < /path/to/rds-pending-actions-summary.txt
+
+# Pre-maintenance window check
+./list-rds-pending-actions.sh
+# Review output before scheduling maintenance
+```
+
+PowerShell (Scheduled tasks):
+```powershell
+# Create scheduled task for daily report
+$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument "-File C:\Scripts\list-rds-pending-actions.ps1"
+$trigger = New-ScheduledTaskTrigger -Daily -At 8am
+Register-ScheduledTask -TaskName "RDS Pending Actions Report" `
+  -Action $action -Trigger $trigger
+
+# Integration with monitoring systems
+.\list-rds-pending-actions.ps1
+$csv = Import-Csv rds-pending-actions.csv
+$pendingCount = ($csv | Where-Object { $_.'Pending Maintenance' -ne 'None' }).Count
+if ($pendingCount -gt 0) {
+    Write-Warning "Found $pendingCount instances with pending maintenance"
+    # Send alert to monitoring system
+}
+```
+
+**Understanding Pending Actions**:
+
+**Pending Maintenance Actions**:
+- System updates (security patches, minor version updates)
+- Database engine version upgrades
+- Operating system maintenance
+- Certificate rotations
+- Hardware maintenance
+
+**Auto-Apply Behavior**:
+- AWS will automatically apply maintenance after the auto-apply date if not manually scheduled
+- You can schedule maintenance during your preferred maintenance window before the auto-apply date
+- Some actions can be deferred but will eventually be auto-applied
+
+**Pending Modifications**:
+- Instance class changes (scaling up/down)
+- Storage size or type changes
+- Multi-AZ configuration changes
+- Parameter group changes
+- Option group changes
+- Backup retention changes
+
+**Modification Application**:
+- Some modifications apply immediately when submitted
+- Others are pending and will apply during the next maintenance window
+- You can control timing with `--apply-immediately` flag when making changes
+
+**Best Practices**:
+1. **Review regularly**: Run this report weekly to stay informed of upcoming maintenance
+2. **Plan maintenance windows**: Schedule maintenance during low-traffic periods before auto-apply dates
+3. **Test modifications**: Apply pending modifications to non-production environments first
+4. **Monitor after changes**: Watch performance metrics after modifications are applied
+5. **Document maintenance**: Keep records of when maintenance was performed and any issues encountered
+
+**Proactive Maintenance Workflow**:
+```bash
+# 1. Generate report
+./list-rds-pending-actions.sh
+
+# 2. Review pending actions
+cat rds-pending-actions-summary.txt
+
+# 3. Schedule maintenance for instances with pending actions
+aws rds apply-pending-maintenance-action \
+  --resource-identifier arn:aws:rds:us-east-1:123456789012:db:production-db-01 \
+  --apply-action-name system-update \
+  --opt-in-type immediate  # or use specific date/time
+
+# 4. Apply pending modifications during maintenance window
+aws rds modify-db-instance \
+  --db-instance-identifier production-db-01 \
+  --apply-immediately
+```
 
 ---
 
