@@ -101,6 +101,182 @@ done
 
 See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation, including advanced filtering, integration examples, and troubleshooting.
 
+### AMI and Snapshot Cleanup
+
+**File**: `cleanup-old-amis-snapshots.sh`
+
+Bash script to identify and cleanup Amazon Machine Images (AMIs) older than a specified age threshold and their associated EBS snapshots. This helps reduce storage costs and maintain a clean AWS environment.
+
+**Features**:
+- Identifies AMIs older than specified age (default: 180 days)
+- Automatically discovers and deletes associated EBS snapshots
+- Dry run mode for safe preview (default behavior)
+- Scans single region (configurable)
+- CSV and summary file outputs
+- Calculates AMI age in days
+- Color-coded progress updates
+- Safe deregistration with confirmation
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- jq for JSON parsing: `sudo apt-get install jq` or `brew install jq`
+- AWS credentials configured
+- EC2 permissions (describe-images, deregister-image, delete-snapshot)
+
+**Quick Start**:
+```bash
+# Dry run - identify old AMIs without removing them (default)
+DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+
+# Cleanup old AMIs and snapshots in default region (us-east-1)
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Cleanup in specific region with custom age threshold
+AWS_REGION=us-west-2 AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Preview what would be cleaned up in production region
+AWS_REGION=eu-west-1 DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+```
+
+**Configuration Options**:
+- **AWS_REGION**: Target region (default: us-east-1)
+- **AGE_DAYS**: Age threshold in days (default: 180)
+- **DRY_RUN**: Preview mode without making changes (default: true)
+
+**Common Use Cases**:
+```bash
+# Monthly cleanup of AMIs older than 180 days
+DRY_RUN=false AWS_REGION=us-east-1 ./cleanup-old-amis-snapshots.sh
+
+# Review old AMIs before cleanup
+DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+# Review old-amis-cleanup.csv
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Cleanup across multiple regions
+for region in us-east-1 us-west-2 eu-west-1; do
+  echo "Cleaning up region: $region"
+  AWS_REGION=$region DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+done
+
+# Aggressive cleanup (90 days)
+AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+```
+
+**Cost Savings**:
+- AMI storage is billed based on snapshot storage costs
+- EBS snapshots cost $0.05 per GB-month (standard)
+- Example: 100 GB AMI with snapshots = $5/month = $60/year per AMI
+- 50 old AMIs × $60/year = **$3,000/year in storage savings**
+
+**Safety Features**:
+- Dry run mode by default (must explicitly set `DRY_RUN=false`)
+- Only processes AMIs owned by your account
+- Age verification before deletion
+- Detailed logging of all operations
+- CSV output for audit trail
+- Automatically handles snapshot cleanup after AMI deregistration
+
+**Output Example**:
+```
+==========================================
+AMI and Snapshot Cleanup
+==========================================
+
+AWS Account ID: 123456789012
+Region: us-east-1
+Age threshold: 180 days
+DRY RUN MODE: No changes will be made
+
+Cutoff date: 2024-05-18T00:00:00.000Z
+AMIs created before this date will be targeted for cleanup
+
+Found 45 AMI(s) owned by this account
+
+Analyzing AMIs...
+
+AMI: ami-12345678
+  Name: web-server-2023-01-15
+  Created: 2023-01-15T10:30:00.000Z (304 days ago)
+  State: available
+  → AMI is older than 180 days
+  Associated snapshots (2): snap-abc123 snap-def456
+  Deregistering AMI...
+    [DRY RUN] Would deregister AMI: ami-12345678
+  Deleting associated snapshots...
+      [DRY RUN] Would delete snapshot: snap-abc123
+      [DRY RUN] Would delete snapshot: snap-def456
+
+AMI: ami-87654321
+  Name: app-server-2024-10-01
+  Created: 2024-10-01T14:20:00.000Z (45 days ago)
+  State: available
+  → AMI is recent (< 180 days)
+
+SUMMARY
+==========================================
+Total AMIs found: 45
+AMIs older than 180 days: 23
+Recent AMIs (< 180 days): 22
+
+AMIs deregistered: 23
+Snapshots deleted: 58
+
+Output files:
+  Summary: old-amis-cleanup-summary.txt
+  CSV:     old-amis-cleanup.csv
+
+This was a dry run. No changes were made.
+Run with DRY_RUN=false to actually deregister AMIs and delete snapshots.
+```
+
+**Required AWS Permissions**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeImages",
+        "ec2:DeregisterImage",
+        "ec2:DescribeSnapshots",
+        "ec2:DeleteSnapshot"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Integration Examples**:
+```bash
+# Monthly cleanup job (cron) - dry run for review
+0 0 1 * * /usr/local/bin/cleanup-old-amis-snapshots.sh
+
+# Quarterly aggressive cleanup
+0 0 1 */3 * DRY_RUN=false AGE_DAYS=180 /usr/local/bin/cleanup-old-amis-snapshots.sh
+
+# Pre-deployment cleanup with approval
+./cleanup-old-amis-snapshots.sh > review.txt
+# Review review.txt and approve
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Multi-region with different thresholds
+AWS_REGION=us-east-1 AGE_DAYS=365 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+AWS_REGION=us-west-2 AGE_DAYS=180 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+```
+
+**Important Notes**:
+- **AMI deregistration is irreversible** - Ensure you have proper backups
+- Always run in dry-run mode first to review what will be deleted
+- Consider keeping "golden images" or production AMIs regardless of age
+- Use tags to mark AMIs that should be retained
+- The script only processes AMIs owned by your account (not shared or public AMIs)
+- Snapshots are only deleted if they were associated with the deregistered AMI
+
+---
+
 ### Route 53 Empty Zones Cleanup
 
 **File**: `cleanup-empty-route53-zones.py`
