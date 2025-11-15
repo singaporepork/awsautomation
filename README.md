@@ -107,9 +107,11 @@ See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation,
 
 ### Public IP Resources Inventory
 
-**File**: `find-public-ip-resources.sh`
+**Files**:
+- `find-public-ip-resources.sh` - Bash script for Linux/macOS
+- `find-public-ip-resources.ps1` - PowerShell script for Windows
 
-Comprehensive shell script to identify all AWS resources with public IP addresses across all VPCs in all regions.
+Comprehensive scripts to identify all AWS resources with public IP addresses across all VPCs in all regions.
 
 **Resource Types Detected**:
 - EC2 instances with public IPs
@@ -128,15 +130,19 @@ Comprehensive shell script to identify all AWS resources with public IP addresse
 
 **Prerequisites**:
 - AWS CLI installed and configured
-- jq (recommended for full functionality)
+- **Bash version**: jq (recommended for full functionality)
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
 - Read-only AWS permissions for EC2, ELB, RDS
 
 **Quick Start**:
 ```bash
-# Run the inventory scan
+# Bash (Linux/macOS)
 ./find-public-ip-resources.sh
 
-# Review outputs
+# PowerShell (Windows)
+.\find-public-ip-resources.ps1
+
+# Review outputs (same for both)
 cat public-ip-resources.csv              # CSV format
 cat public-ip-resources.json             # JSON format
 cat public-ip-resources-report.txt       # Human-readable report

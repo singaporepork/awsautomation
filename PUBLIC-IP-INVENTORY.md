@@ -1,10 +1,16 @@
-# Public IP Resources Inventory Script
+# Public IP Resources Inventory Scripts
 
-Shell script to identify all AWS resources with public IP addresses across all VPCs in all regions. This helps identify potential security exposure points in your AWS infrastructure.
+Scripts to identify all AWS resources with public IP addresses across all VPCs in all regions. This helps identify potential security exposure points in your AWS infrastructure.
+
+**Available Versions:**
+- `find-public-ip-resources.sh` - Bash script for Linux/macOS
+- `find-public-ip-resources.ps1` - PowerShell script for Windows
+
+Both scripts provide identical functionality and output format, allowing you to use the appropriate version for your operating system.
 
 ## Overview
 
-This script scans your entire AWS account across all regions to find resources that have public IP addresses or are publicly accessible. It's essential for:
+These scripts scan your entire AWS account across all regions to find resources that have public IP addresses or are publicly accessible. They're essential for:
 
 - **Security audits**: Identify all publicly exposed resources
 - **Compliance**: Ensure only authorized resources are publicly accessible
@@ -50,14 +56,14 @@ The script identifies the following resource types with public IPs:
 
 ## Prerequisites
 
-### Required Tools
+### Bash Script (Linux/macOS)
 
 1. **AWS CLI**: Must be installed and configured
    ```bash
    aws --version
    ```
 
-2. **jq**: JSON processor (highly recommended)
+2. **jq**: JSON processor (highly recommended for bash version)
    ```bash
    # Ubuntu/Debian
    sudo apt-get install jq
@@ -69,9 +75,20 @@ The script identifies the following resource types with public IPs:
    sudo yum install jq
    ```
 
-   **Note**: The script will work without jq but with limited functionality
+   **Note**: The bash script will work without jq but with limited functionality
 
-### AWS Requirements
+### PowerShell Script (Windows)
+
+1. **PowerShell 5.0 or later**: Included with Windows 10/11 and Windows Server 2016+
+   - Check version: `$PSVersionTable.PSVersion`
+
+2. **AWS CLI**: Must be installed and configured
+   - Download from: https://aws.amazon.com/cli/
+   - Install using MSI installer
+
+3. **No additional dependencies**: The PowerShell version uses native JSON parsing
+
+### AWS Requirements (Both Scripts)
 
 1. **AWS credentials** configured via:
    - AWS CLI: `aws configure`
@@ -106,10 +123,17 @@ The script identifies the following resource types with public IPs:
 
 ### Basic Usage
 
-Run the script to scan all regions:
-
+**Bash (Linux/macOS):**
 ```bash
 ./find-public-ip-resources.sh
+```
+
+**PowerShell (Windows):**
+```powershell
+.\find-public-ip-resources.ps1
+
+# Or specify custom output path
+.\find-public-ip-resources.ps1 -OutputPath "C:\Reports"
 ```
 
 ### Expected Runtime
