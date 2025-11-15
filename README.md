@@ -483,6 +483,134 @@ aws logs tail /aws/vpc/flowlogs --follow
 
 See [VPC-FLOWLOGS-ENABLEMENT.md](VPC-FLOWLOGS-ENABLEMENT.md) for complete documentation, including advanced usage, cost analysis, verification steps, and troubleshooting.
 
+### VPC Gateway Endpoints Setup
+
+**Files**:
+- `create-gateway-endpoints.sh` - Bash script for Linux/macOS
+- `create-gateway-endpoints.ps1` - PowerShell script for Windows
+
+Automated scripts to create VPC Gateway Endpoints (S3 and DynamoDB) in all VPCs across all AWS regions with automatic route table configuration using prefix list IDs.
+
+**Features**:
+- Creates gateway endpoints for S3 or DynamoDB services
+- Automatic route table discovery and configuration
+- Uses prefix list IDs for routing (not CIDR blocks)
+- Checks for existing endpoints to avoid duplicates
+- Dry run mode for previewing changes
+- Supports both public and private VPCs
+- CSV and summary file outputs
+- Color-coded progress updates
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- **Bash version**: Bash 4.0+
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
+- AWS permissions for EC2 VPC endpoint and route management
+
+**Quick Start**:
+```bash
+# Bash - Create S3 gateway endpoints (default)
+./create-gateway-endpoints.sh
+
+# Bash - Create DynamoDB gateway endpoints
+export SERVICE_NAME=dynamodb
+./create-gateway-endpoints.sh
+
+# Bash - Dry run mode
+DRY_RUN=true ./create-gateway-endpoints.sh
+
+# PowerShell - Create S3 gateway endpoints (default)
+.\create-gateway-endpoints.ps1
+
+# PowerShell - Create DynamoDB gateway endpoints
+.\create-gateway-endpoints.ps1 -ServiceName dynamodb
+
+# PowerShell - Dry run mode
+.\create-gateway-endpoints.ps1 -DryRun
+```
+
+**Configuration Options**:
+- **Service Name**: `s3` (default) or `dynamodb`
+- **Dry Run**: Preview mode without making changes
+
+**What Gets Created**:
+- VPC Gateway Endpoint for the specified service in each VPC
+- Routes in all route tables using prefix list IDs as destinations
+- Automatic association with existing route tables
+- No additional AWS resources required
+
+**Output Files**:
+- `gateway-endpoints-setup.csv` - List of all VPCs with endpoint status
+- `gateway-endpoints-setup-summary.txt` - Detailed summary report
+
+**Cost Savings**:
+Gateway Endpoints are **completely FREE** and provide significant cost savings:
+- **No hourly charges** for the endpoint (unlike NAT Gateway's $0.045/hour)
+- **No data processing charges** for S3/DynamoDB traffic
+- **No data transfer charges** within the same region
+- Example: Replacing NAT Gateway for S3 access saves ~$78/month per VPC
+- 20 VPCs × $78/month = **$1,560/month = $18,720/year in savings**
+
+**Security Benefits**:
+- Private connectivity to AWS services (traffic never leaves AWS network)
+- No Internet Gateway required for S3/DynamoDB access
+- Reduced attack surface
+- VPC endpoint policies for fine-grained access control
+- CloudTrail integration for full audit trail
+
+**Common Use Cases**:
+```bash
+# Cost optimization - eliminate NAT Gateway for S3
+./create-gateway-endpoints.sh
+
+# Enable both S3 and DynamoDB endpoints
+./create-gateway-endpoints.sh
+export SERVICE_NAME=dynamodb
+./create-gateway-endpoints.sh
+
+# Preview what would be created
+DRY_RUN=true ./create-gateway-endpoints.sh
+
+# Review outputs
+cat gateway-endpoints-setup.csv          # Spreadsheet view
+cat gateway-endpoints-setup-summary.txt  # Summary report
+
+# Verify endpoints are working
+aws ec2 describe-vpc-endpoints --filters "Name=vpc-endpoint-type,Values=Gateway"
+```
+
+**Route Configuration**:
+Routes are created using **prefix list IDs** (not CIDR blocks):
+```
+Destination: pl-63a5400a (S3 prefix list for us-east-1)
+Target: vpce-xxxxxx (gateway endpoint ID)
+```
+
+Prefix lists are AWS-managed and automatically updated with current IP ranges.
+
+**Integration Examples**:
+```bash
+# Include in VPC provisioning
+./create-vpc.sh && ./create-gateway-endpoints.sh
+
+# Monthly audit to ensure all VPCs have endpoints
+./create-gateway-endpoints.sh --dry-run
+
+# Multi-service deployment
+for service in s3 dynamodb; do
+  export SERVICE_NAME=$service
+  ./create-gateway-endpoints.sh
+done
+```
+
+**Performance Benefits**:
+- Lower latency (direct path to AWS services)
+- Higher throughput (no NAT Gateway bottleneck)
+- Better reliability (fewer network hops)
+- Simpler routing architecture
+
+See [GATEWAY-ENDPOINTS.md](GATEWAY-ENDPOINTS.md) for complete documentation, including cost analysis, advanced configuration, VPC endpoint policies, and troubleshooting.
+
 ---
 
 ## IAM Audit Scripts
