@@ -1,0 +1,7 @@
+# AWS Security Automation - Python Requirements
+# Install with: pip install -r requirements.txt
+
+# AWS SDK for Python
+boto3>=1.26.0
+
+# Note: botocore is installed automatically with boto3

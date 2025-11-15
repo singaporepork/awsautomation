@@ -5,6 +5,7 @@ This repository contains tools and Infrastructure as Code (IaC) for AWS security
 ## Contents
 
 - **[IAM Audit Scripts](#iam-audit-scripts)**: Bash and PowerShell scripts for auditing IAM security configurations
+- **[Python Scripts](#python-scripts)**: Python tools for exporting and analyzing security data
 - **[Terraform Modules](#terraform-modules)**: Infrastructure as Code for deploying AWS security services
 
 ---
@@ -32,6 +33,72 @@ terraform apply
 ```
 
 See the [Terraform README](terraform/README.md) for complete documentation.
+
+---
+
+## Python Scripts
+
+### Security Hub Findings Exporter
+
+**File**: `export-securityhub-findings.py`
+
+Python script to export AWS Security Hub findings from a single region to JSON format with comprehensive filtering and metadata.
+
+**Features**:
+- Complete findings export with automatic pagination
+- Filter by severity, workflow status, compliance status, and record state
+- Rich metadata including export timestamp and summary statistics
+- Summary report with findings breakdown
+- AWS profile support for multi-account access
+
+**Prerequisites**:
+- Python 3.6 or higher
+- boto3 library: `pip install -r requirements.txt`
+- AWS credentials configured
+- Security Hub enabled in target region
+
+**Quick Start**:
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Export all findings
+./export-securityhub-findings.py --region us-east-1 --output findings.json
+
+# Export only CRITICAL findings
+./export-securityhub-findings.py \
+  --region us-east-1 \
+  --severity CRITICAL \
+  --output critical-findings.json
+
+# View summary only
+./export-securityhub-findings.py --region us-east-1 --summary-only
+```
+
+**Common Use Cases**:
+```bash
+# Export NEW critical/high findings for immediate review
+./export-securityhub-findings.py \
+  --region us-east-1 \
+  --severity CRITICAL HIGH \
+  --workflow-status NEW \
+  --output new-critical.json
+
+# Export failed compliance checks
+./export-securityhub-findings.py \
+  --region us-east-1 \
+  --compliance-status FAILED \
+  --output compliance-failures.json
+
+# Multi-region export
+for region in us-east-1 us-west-2; do
+  ./export-securityhub-findings.py \
+    --region $region \
+    --output findings-${region}.json
+done
+```
+
+See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation, including advanced filtering, integration examples, and troubleshooting.
 
 ---
 
