@@ -180,6 +180,63 @@ jq -r '.resources[] | select(.resource_type == "RDS Instance")' public-ip-resour
 
 See [PUBLIC-IP-INVENTORY.md](PUBLIC-IP-INVENTORY.md) for complete documentation, including detailed examples, integration patterns, and analysis techniques.
 
+### VPC Flow Logs IAM Role Setup
+
+**Files**:
+- `create-vpc-flowlogs-role.sh` - Bash script for Linux/macOS
+- `create-vpc-flowlogs-role.ps1` - PowerShell script for Windows
+
+Scripts to create an IAM role with proper trust policy and permissions for VPC Flow Logs to publish to CloudWatch Logs.
+
+**Features**:
+- Creates IAM role with VPC Flow Logs trust policy
+- Attaches inline policy with required CloudWatch Logs permissions
+- Updates existing role if already created
+- Provides next steps for enabling flow logs
+- Tags role for identification
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- IAM permissions to create roles and policies
+
+**Quick Start**:
+```bash
+# Bash (Linux/macOS)
+./create-vpc-flowlogs-role.sh
+
+# PowerShell (Windows)
+.\create-vpc-flowlogs-role.ps1
+
+# Custom role name (PowerShell)
+.\create-vpc-flowlogs-role.ps1 -RoleName "MyVPCFlowLogsRole"
+```
+
+**What Gets Created**:
+- IAM role with trust policy for `vpc-flow-logs.amazonaws.com`
+- Inline policy granting CloudWatch Logs permissions:
+  - `logs:CreateLogGroup`
+  - `logs:CreateLogStream`
+  - `logs:PutLogEvents`
+  - `logs:DescribeLogGroups`
+  - `logs:DescribeLogStreams`
+
+**After Running**:
+```bash
+# 1. Create CloudWatch log group
+aws logs create-log-group --log-group-name /aws/vpc/flowlogs
+
+# 2. Enable VPC Flow Logs
+aws ec2 create-flow-logs \
+  --resource-type VPC \
+  --resource-ids vpc-xxxxxxxx \
+  --traffic-type ALL \
+  --log-destination-type cloud-watch-logs \
+  --log-group-name /aws/vpc/flowlogs \
+  --deliver-logs-permission-arn arn:aws:iam::ACCOUNT-ID:role/VPCFlowLogsRole
+```
+
+See [VPC-FLOWLOGS-ROLE.md](VPC-FLOWLOGS-ROLE.md) for complete documentation, including detailed usage examples, cost considerations, and troubleshooting.
+
 ---
 
 ## IAM Audit Scripts
