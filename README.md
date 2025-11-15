@@ -101,6 +101,152 @@ done
 
 See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation, including advanced filtering, integration examples, and troubleshooting.
 
+### Route 53 Empty Zones Cleanup
+
+**File**: `cleanup-empty-route53-zones.py`
+
+Python script to identify and delete Route 53 hosted zones that only contain NS and SOA records (default records). These empty zones are often leftover from testing or decommissioned applications and cost $0.50/month each.
+
+**Features**:
+- Identifies hosted zones with only default NS and SOA records
+- Dry run mode for safe preview (default behavior)
+- Delete mode with confirmation prompt or force flag
+- CSV and JSON export of findings
+- Calculates potential monthly cost savings
+- Supports both public and private hosted zones
+- Detailed summary reports
+
+**Prerequisites**:
+- Python 3.6 or higher
+- boto3 library: `pip install -r requirements.txt`
+- AWS credentials configured
+- Route 53 permissions (list and delete hosted zones)
+
+**Quick Start**:
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Dry run - identify empty zones without deleting
+./cleanup-empty-route53-zones.py --dry-run
+
+# Delete empty zones with confirmation prompt
+./cleanup-empty-route53-zones.py --delete
+
+# Delete without confirmation (use with caution!)
+./cleanup-empty-route53-zones.py --delete --force
+
+# Export findings to CSV and JSON
+./cleanup-empty-route53-zones.py --dry-run --output-csv empty-zones.csv --output-json empty-zones.json
+
+# Use specific AWS profile
+./cleanup-empty-route53-zones.py --profile production --dry-run
+```
+
+**Common Use Cases**:
+```bash
+# Identify all empty zones and potential savings
+./cleanup-empty-route53-zones.py --dry-run
+
+# Review and export before cleanup
+./cleanup-empty-route53-zones.py --dry-run --output-csv zones-to-delete.csv
+# Review zones-to-delete.csv
+./cleanup-empty-route53-zones.py --delete --force
+
+# Clean up in specific account
+./cleanup-empty-route53-zones.py --profile production --delete
+
+# Automated cleanup in CI/CD (after review)
+./cleanup-empty-route53-zones.py --delete --force --output-json cleanup-report.json
+```
+
+**Cost Savings**:
+- Each hosted zone costs $0.50/month
+- Empty zones provide no value but still incur charges
+- Script calculates potential monthly savings
+- Example: 20 empty zones = $10/month = $120/year in savings
+
+**Safety Features**:
+- Dry run mode by default (must explicitly use `--delete`)
+- Confirmation prompt before deletion (unless `--force` used)
+- Only deletes zones with ONLY NS and SOA records
+- Never deletes zones with A, CNAME, MX, TXT, or other record types
+- Detailed reporting of what will be/was deleted
+
+**Output Example**:
+```
+Route 53 Empty Hosted Zones Cleanup
+Mode: DRY RUN (identification only)
+
+Scanning Route 53 hosted zones...
+Found 15 hosted zone(s) to analyze
+
+[1/15] Checking zone: example.com. (Public)
+  → Active zone (5 records: NS=1, SOA=1, A=2, CNAME=1)
+[2/15] Checking zone: old-test.com. (Public)
+  → Empty zone (only NS and SOA records)
+[3/15] Checking zone: staging.internal. (Private)
+  → Empty zone (only NS and SOA records)
+...
+
+Empty zones found: 8
+Active zones found: 7
+Potential monthly savings: $4.00
+
+SUMMARY
+Total hosted zones:        15
+Empty zones (NS/SOA only): 8
+Active zones:              7
+Potential monthly savings: $4.00
+
+Empty zones found:
+  - old-test.com. (Public)
+  - staging.internal. (Private)
+  - dev-environment.com. (Public)
+  ...
+
+This was a DRY RUN - no zones were deleted.
+Run without --dry-run to actually delete the zones.
+```
+
+**Required AWS Permissions**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:ListHostedZones",
+        "route53:ListResourceRecordSets",
+        "route53:GetHostedZone",
+        "route53:DeleteHostedZone"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Integration Examples**:
+```bash
+# Monthly cleanup job (cron)
+0 0 1 * * /usr/local/bin/cleanup-empty-route53-zones.py --delete --force --output-json /var/log/route53-cleanup.json
+
+# Pre-deployment cleanup
+./cleanup-empty-route53-zones.py --dry-run --output-csv zones.csv
+if [ $(grep "Empty" zones.csv | wc -l) -gt 0 ]; then
+  echo "Found empty zones to clean up"
+  ./cleanup-empty-route53-zones.py --delete --force
+fi
+
+# Multi-account cleanup
+for account in prod staging dev; do
+  echo "Cleaning up account: $account"
+  ./cleanup-empty-route53-zones.py --profile $account --delete --force
+done
+```
+
 ---
 
 ## Network Security Scripts
