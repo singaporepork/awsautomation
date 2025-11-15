@@ -237,6 +237,106 @@ aws ec2 create-flow-logs \
 
 See [VPC-FLOWLOGS-ROLE.md](VPC-FLOWLOGS-ROLE.md) for complete documentation, including detailed usage examples, cost considerations, and troubleshooting.
 
+### VPC Flow Logs Enablement
+
+**Files**:
+- `enable-vpc-flowlogs.sh` - Bash script for Linux/macOS
+- `enable-vpc-flowlogs.ps1` - PowerShell script for Windows
+
+Automated scripts to enable VPC Flow Logs on all VPCs across all AWS regions with CloudWatch Logs as the destination.
+
+**Features**:
+- Automatic region discovery and VPC enumeration
+- CloudWatch Log Group creation (one per region)
+- Checks for existing flow logs to avoid duplicates
+- Dry run mode for previewing changes
+- Configurable traffic type (ALL, ACCEPT, REJECT)
+- CSV and summary file outputs
+- Color-coded progress updates
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- **Bash version**: jq recommended for full functionality
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
+- IAM role for VPC Flow Logs (see VPC Flow Logs IAM Role Setup above)
+- AWS permissions for EC2, CloudWatch Logs, and IAM
+
+**Quick Start**:
+```bash
+# Bash (Linux/macOS)
+./enable-vpc-flowlogs.sh
+
+# PowerShell (Windows)
+.\enable-vpc-flowlogs.ps1
+
+# Dry run mode
+DRY_RUN=true ./enable-vpc-flowlogs.sh              # Bash
+.\enable-vpc-flowlogs.ps1 -DryRun                  # PowerShell
+
+# Custom configuration (Bash)
+export ROLE_ARN="arn:aws:iam::123456789012:role/MyFlowLogsRole"
+export LOG_GROUP_PREFIX="/aws/vpc/flowlogs"
+export TRAFFIC_TYPE=REJECT
+./enable-vpc-flowlogs.sh
+
+# Custom configuration (PowerShell)
+.\enable-vpc-flowlogs.ps1 `
+  -RoleArn "arn:aws:iam::123456789012:role/MyFlowLogsRole" `
+  -LogGroupPrefix "/aws/vpc/flowlogs" `
+  -TrafficType REJECT
+```
+
+**Configuration Options**:
+- **Role ARN**: Auto-detected (VPCFlowLogsRole) or custom
+- **Log Group Prefix**: Default `/aws/vpc/flowlogs`
+- **Traffic Type**: `ALL` (default), `ACCEPT`, or `REJECT`
+- **Dry Run**: Preview mode without making changes
+
+**What Gets Enabled**:
+- VPC Flow Logs on all VPCs without existing flow logs
+- CloudWatch Log Groups in each region
+- Traffic logging with specified type (ALL/ACCEPT/REJECT)
+- Automatic tagging and organization
+
+**Output Files**:
+- `vpc-flowlogs-enablement.csv` - List of all VPCs with enablement status
+- `vpc-flowlogs-enablement-summary.txt` - Detailed summary report
+
+**Common Use Cases**:
+```bash
+# Enable flow logs on all VPCs (comprehensive monitoring)
+./enable-vpc-flowlogs.sh
+
+# Security monitoring (rejected traffic only, reduces costs)
+export TRAFFIC_TYPE=REJECT
+./enable-vpc-flowlogs.sh
+
+# Preview what would be enabled
+DRY_RUN=true ./enable-vpc-flowlogs.sh
+
+# Review outputs
+cat vpc-flowlogs-enablement.csv          # Spreadsheet view
+cat vpc-flowlogs-enablement-summary.txt  # Summary report
+
+# Verify flow logs are working (wait 10-15 minutes)
+aws logs tail /aws/vpc/flowlogs --follow
+```
+
+**Cost Optimization**:
+- Use `TRAFFIC_TYPE=REJECT` to log only rejected traffic (80-95% cost reduction)
+- Set retention policies: `aws logs put-retention-policy --log-group-name /aws/vpc/flowlogs --retention-in-days 7`
+- Consider S3 destination for long-term storage (cheaper than CloudWatch)
+- Use custom log format to reduce data volume
+
+**Security Benefits**:
+- Comprehensive network traffic visibility
+- Detect unusual traffic patterns and potential attacks
+- Meet compliance requirements (PCI-DSS, HIPAA, SOC 2, NIST)
+- Support incident response and forensic investigations
+- Troubleshoot connectivity issues
+
+See [VPC-FLOWLOGS-ENABLEMENT.md](VPC-FLOWLOGS-ENABLEMENT.md) for complete documentation, including advanced usage, cost analysis, verification steps, and troubleshooting.
+
 ---
 
 ## IAM Audit Scripts
