@@ -1,8 +1,45 @@
-# AWS IAM Security Audit Scripts
+# AWS Security Automation
 
-This repository contains security audit scripts for AWS IAM to help identify potential security issues and maintain compliance with AWS best practices.
+This repository contains tools and Infrastructure as Code (IaC) for AWS security automation, compliance monitoring, and security service deployment.
 
-## Available Scripts
+## Contents
+
+- **[IAM Audit Scripts](#iam-audit-scripts)**: Bash and PowerShell scripts for auditing IAM security configurations
+- **[Terraform Modules](#terraform-modules)**: Infrastructure as Code for deploying AWS security services
+
+---
+
+## Terraform Modules
+
+### Security Services Deployment
+
+**Location**: `terraform/`
+
+Terraform module to enable and configure AWS security services across multiple regions:
+
+- **AWS Config**: Configuration recording and compliance monitoring
+- **AWS GuardDuty**: Threat detection and continuous security monitoring
+- **AWS Security Hub**: Centralized security findings aggregation
+
+**Regions**: us-east-1 and us-west-2
+
+**Quick Start**:
+```bash
+cd terraform/
+terraform init
+terraform plan
+terraform apply
+```
+
+See the [Terraform README](terraform/README.md) for complete documentation.
+
+---
+
+## IAM Audit Scripts
+
+Security audit scripts for AWS IAM to help identify potential security issues and maintain compliance with AWS best practices.
+
+### Available Scripts
 
 ### IAM Password Policy Audit
 Identifies IAM users who do not have the "IAMUserChangePassword" policy attached.

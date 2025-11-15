@@ -1,0 +1,26 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and customize as needed
+
+# Common tags applied to all resources
+common_tags = {
+  ManagedBy   = "Terraform"
+  Environment = "Production"
+  Purpose     = "Security-Services"
+  Owner       = "SecurityTeam"
+  CostCenter  = "Security"
+}
+
+# AWS Config Settings
+config_bucket_prefix                      = "aws-config"
+force_destroy_buckets                     = false  # Set to true only for testing/dev environments
+config_include_global_resources_us_east_1 = true   # Only one region should have this set to true
+config_include_global_resources_us_west_2 = false
+
+# GuardDuty Settings
+guardduty_finding_frequency         = "FIFTEEN_MINUTES"  # Options: FIFTEEN_MINUTES, ONE_HOUR, SIX_HOURS
+guardduty_enable_s3_logs            = true
+guardduty_enable_kubernetes         = true
+guardduty_enable_malware_protection = true
+
+# Security Hub Settings
+securityhub_control_finding_generator = "SECURITY_CONTROL"  # Options: SECURITY_CONTROL, STANDARD_CONTROL
