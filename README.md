@@ -6,6 +6,7 @@ This repository contains tools and Infrastructure as Code (IaC) for AWS security
 
 - **[IAM Audit Scripts](#iam-audit-scripts)**: Bash and PowerShell scripts for auditing IAM security configurations
 - **[Network Security Scripts](#network-security-scripts)**: Scripts for network security and public exposure analysis
+- **[RDS Management Scripts](#rds-pending-actions-report)**: Scripts for RDS database maintenance and monitoring
 - **[Python Scripts](#python-scripts)**: Python tools for exporting and analyzing security data
 - **[Terraform Modules](#terraform-modules)**: Infrastructure as Code for deploying AWS security services
 
@@ -100,6 +101,488 @@ done
 ```
 
 See [SECURITY-HUB-EXPORT.md](SECURITY-HUB-EXPORT.md) for complete documentation, including advanced filtering, integration examples, and troubleshooting.
+
+### AMI and Snapshot Cleanup
+
+**Files**:
+- `cleanup-old-amis-snapshots.sh` - Bash script for Linux/macOS
+- `cleanup-old-amis-snapshots.ps1` - PowerShell script for Windows
+
+Scripts to identify and cleanup Amazon Machine Images (AMIs) older than a specified age threshold and their associated EBS snapshots. This helps reduce storage costs and maintain a clean AWS environment.
+
+**Features**:
+- Identifies AMIs older than specified age (default: 180 days)
+- Automatically discovers and deletes associated EBS snapshots
+- Dry run mode for safe preview (default behavior)
+- Scans single region (configurable)
+- CSV and summary file outputs
+- Calculates AMI age in days
+- Color-coded progress updates
+- Safe deregistration with confirmation
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- **Bash version**: jq for JSON parsing: `sudo apt-get install jq` or `brew install jq`
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
+- AWS credentials configured
+- EC2 permissions (describe-images, deregister-image, delete-snapshot)
+
+**Quick Start**:
+
+Bash (Linux/macOS):
+```bash
+# Dry run - identify old AMIs without removing them (default)
+DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+
+# Cleanup old AMIs and snapshots in default region (us-east-1)
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Cleanup in specific region with custom age threshold
+AWS_REGION=us-west-2 AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Preview what would be cleaned up in production region
+AWS_REGION=eu-west-1 DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+```
+
+PowerShell (Windows):
+```powershell
+# Dry run - identify old AMIs without removing them
+.\cleanup-old-amis-snapshots.ps1 -DryRun
+
+# Cleanup old AMIs and snapshots in default region (us-east-1)
+.\cleanup-old-amis-snapshots.ps1
+
+# Cleanup in specific region with custom age threshold
+.\cleanup-old-amis-snapshots.ps1 -Region us-west-2 -AgeDays 90
+
+# Preview what would be cleaned up in production region
+.\cleanup-old-amis-snapshots.ps1 -Region eu-west-1 -DryRun
+```
+
+**Configuration Options**:
+
+Bash:
+- **AWS_REGION**: Target region (default: us-east-1)
+- **AGE_DAYS**: Age threshold in days (default: 180)
+- **DRY_RUN**: Preview mode without making changes (default: true)
+
+PowerShell:
+- **-Region**: Target region (default: us-east-1)
+- **-AgeDays**: Age threshold in days (default: 180)
+- **-DryRun**: Switch to enable preview mode
+
+**Common Use Cases**:
+
+Bash:
+```bash
+# Monthly cleanup of AMIs older than 180 days
+DRY_RUN=false AWS_REGION=us-east-1 ./cleanup-old-amis-snapshots.sh
+
+# Review old AMIs before cleanup
+DRY_RUN=true ./cleanup-old-amis-snapshots.sh
+# Review old-amis-cleanup.csv
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Cleanup across multiple regions
+for region in us-east-1 us-west-2 eu-west-1; do
+  echo "Cleaning up region: $region"
+  AWS_REGION=$region DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+done
+
+# Aggressive cleanup (90 days)
+AGE_DAYS=90 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+```
+
+PowerShell:
+```powershell
+# Monthly cleanup of AMIs older than 180 days
+.\cleanup-old-amis-snapshots.ps1 -Region us-east-1
+
+# Review old AMIs before cleanup
+.\cleanup-old-amis-snapshots.ps1 -DryRun
+# Review old-amis-cleanup.csv
+.\cleanup-old-amis-snapshots.ps1
+
+# Cleanup across multiple regions
+@('us-east-1', 'us-west-2', 'eu-west-1') | ForEach-Object {
+    Write-Host "Cleaning up region: $_"
+    .\cleanup-old-amis-snapshots.ps1 -Region $_
+}
+
+# Aggressive cleanup (90 days)
+.\cleanup-old-amis-snapshots.ps1 -AgeDays 90
+```
+
+**Cost Savings**:
+- AMI storage is billed based on snapshot storage costs
+- EBS snapshots cost $0.05 per GB-month (standard)
+- Example: 100 GB AMI with snapshots = $5/month = $60/year per AMI
+- 50 old AMIs × $60/year = **$3,000/year in storage savings**
+
+**Safety Features**:
+- Dry run mode available for safe preview
+  - Bash: Default is true (must explicitly set `DRY_RUN=false`)
+  - PowerShell: Use `-DryRun` switch to enable
+- Only processes AMIs owned by your account
+- Age verification before deletion
+- Detailed logging of all operations
+- CSV output for audit trail
+- Automatically handles snapshot cleanup after AMI deregistration
+
+**Output Example**:
+```
+==========================================
+AMI and Snapshot Cleanup
+==========================================
+
+AWS Account ID: 123456789012
+Region: us-east-1
+Age threshold: 180 days
+DRY RUN MODE: No changes will be made
+
+Cutoff date: 2024-05-18T00:00:00.000Z
+AMIs created before this date will be targeted for cleanup
+
+Found 45 AMI(s) owned by this account
+
+Analyzing AMIs...
+
+AMI: ami-12345678
+  Name: web-server-2023-01-15
+  Created: 2023-01-15T10:30:00.000Z (304 days ago)
+  State: available
+  → AMI is older than 180 days
+  Associated snapshots (2): snap-abc123 snap-def456
+  Deregistering AMI...
+    [DRY RUN] Would deregister AMI: ami-12345678
+  Deleting associated snapshots...
+      [DRY RUN] Would delete snapshot: snap-abc123
+      [DRY RUN] Would delete snapshot: snap-def456
+
+AMI: ami-87654321
+  Name: app-server-2024-10-01
+  Created: 2024-10-01T14:20:00.000Z (45 days ago)
+  State: available
+  → AMI is recent (< 180 days)
+
+SUMMARY
+==========================================
+Total AMIs found: 45
+AMIs older than 180 days: 23
+Recent AMIs (< 180 days): 22
+
+AMIs deregistered: 23
+Snapshots deleted: 58
+
+Output files:
+  Summary: old-amis-cleanup-summary.txt
+  CSV:     old-amis-cleanup.csv
+
+This was a dry run. No changes were made.
+Run with DRY_RUN=false to actually deregister AMIs and delete snapshots.
+```
+
+**Required AWS Permissions**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeImages",
+        "ec2:DeregisterImage",
+        "ec2:DescribeSnapshots",
+        "ec2:DeleteSnapshot"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Integration Examples**:
+
+Bash (Cron jobs):
+```bash
+# Monthly cleanup job - dry run for review
+0 0 1 * * /usr/local/bin/cleanup-old-amis-snapshots.sh
+
+# Quarterly aggressive cleanup
+0 0 1 */3 * DRY_RUN=false AGE_DAYS=180 /usr/local/bin/cleanup-old-amis-snapshots.sh
+
+# Pre-deployment cleanup with approval
+./cleanup-old-amis-snapshots.sh > review.txt
+# Review review.txt and approve
+DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+
+# Multi-region with different thresholds
+AWS_REGION=us-east-1 AGE_DAYS=365 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+AWS_REGION=us-west-2 AGE_DAYS=180 DRY_RUN=false ./cleanup-old-amis-snapshots.sh
+```
+
+PowerShell (Scheduled tasks):
+```powershell
+# Monthly cleanup job via Task Scheduler
+# Create scheduled task that runs:
+powershell.exe -File "C:\Scripts\cleanup-old-amis-snapshots.ps1" -DryRun
+
+# Pre-deployment cleanup with approval
+.\cleanup-old-amis-snapshots.ps1 -DryRun | Out-File review.txt
+# Review review.txt and approve
+.\cleanup-old-amis-snapshots.ps1
+
+# Multi-region with different thresholds
+.\cleanup-old-amis-snapshots.ps1 -Region us-east-1 -AgeDays 365
+.\cleanup-old-amis-snapshots.ps1 -Region us-west-2 -AgeDays 180
+```
+
+**Important Notes**:
+- **AMI deregistration is irreversible** - Ensure you have proper backups
+- Always run in dry-run mode first to review what will be deleted
+- Consider keeping "golden images" or production AMIs regardless of age
+- Use tags to mark AMIs that should be retained
+- The script only processes AMIs owned by your account (not shared or public AMIs)
+- Snapshots are only deleted if they were associated with the deregistered AMI
+
+---
+
+### RDS Pending Actions Report
+
+**Files**:
+- `list-rds-pending-actions.sh` - Bash script for Linux/macOS
+- `list-rds-pending-actions.ps1` - PowerShell script for Windows
+
+Scripts to identify RDS database instances with pending maintenance actions or pending modifications across all AWS regions. Helps proactively manage database maintenance windows and track configuration changes.
+
+**Features**:
+- Scans all AWS regions automatically
+- Identifies pending maintenance actions (OS updates, engine upgrades, etc.)
+- Detects pending modifications (instance class changes, storage changes, etc.)
+- CSV and summary text file outputs
+- Color-coded console output for quick review
+- Detailed reporting of maintenance windows and auto-apply dates
+
+**Prerequisites**:
+- AWS CLI installed and configured
+- **Bash version**: jq recommended (script works without it but provides better output with jq)
+- **PowerShell version**: PowerShell 5.0+ (no additional dependencies)
+- AWS credentials configured
+- RDS permissions (describe-db-instances, describe-pending-maintenance-actions)
+
+**Quick Start**:
+
+Bash (Linux/macOS):
+```bash
+# Run the report
+./list-rds-pending-actions.sh
+
+# Review outputs
+cat rds-pending-actions.csv              # CSV format
+cat rds-pending-actions-summary.txt      # Summary report
+```
+
+PowerShell (Windows):
+```powershell
+# Run the report
+.\list-rds-pending-actions.ps1
+
+# Review outputs
+Get-Content rds-pending-actions.csv           # CSV format
+Get-Content rds-pending-actions-summary.txt   # Summary report
+```
+
+**Output Example**:
+```
+==========================================
+RDS Pending Actions Report
+==========================================
+
+AWS Account ID: 123456789012
+Report Date: 2024-11-15
+
+Fetching AWS regions...
+Found 16 regions to check
+
+Checking region: us-east-1
+  Found 5 RDS instance(s)
+
+  DB Instance: production-db-01
+    Engine: postgres 14.7
+    Class: db.r5.xlarge
+    Status: available
+    Pending Maintenance:
+      system-update (auto-apply: 2024-11-20T04:00:00Z, opt-in: required)
+    Pending Modifications:
+      DBInstanceClass=db.r5.2xlarge; AllocatedStorage=500
+
+  ✓ staging-db-01 - No pending actions
+  ✓ dev-db-01 - No pending actions
+
+Checking region: us-west-2
+  Found 3 RDS instance(s)
+  ✓ analytics-db - No pending actions
+  ✓ reporting-db - No pending actions
+
+SUMMARY
+==========================================
+Total regions checked: 16
+Total RDS instances: 8
+
+Instances with pending actions: 1
+Instances with pending maintenance: 1
+Instances with pending modifications: 1
+
+Output files:
+  Summary: rds-pending-actions-summary.txt
+  CSV:     rds-pending-actions.csv
+```
+
+**Required AWS Permissions**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances",
+        "rds:DescribePendingMaintenanceActions",
+        "ec2:DescribeRegions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Common Use Cases**:
+
+Bash:
+```bash
+# Weekly maintenance planning report
+./list-rds-pending-actions.sh > weekly-rds-report.txt
+
+# Extract instances with pending maintenance
+grep -v "None" rds-pending-actions.csv | grep -v "^Region"
+
+# Filter by specific region
+grep "us-east-1" rds-pending-actions.csv
+
+# Automated reporting
+./list-rds-pending-actions.sh && \
+  mail -s "RDS Pending Actions Report" admin@company.com < rds-pending-actions-summary.txt
+```
+
+PowerShell:
+```powershell
+# Weekly maintenance planning report
+.\list-rds-pending-actions.ps1 | Out-File weekly-rds-report.txt
+
+# Extract instances with pending maintenance
+Import-Csv rds-pending-actions.csv | Where-Object { $_.'Pending Maintenance' -ne 'None' }
+
+# Filter by specific region
+Import-Csv rds-pending-actions.csv | Where-Object { $_.Region -eq 'us-east-1' }
+
+# Email the report
+.\list-rds-pending-actions.ps1
+Send-MailMessage -To "admin@company.com" `
+  -Subject "RDS Pending Actions Report" `
+  -Body (Get-Content rds-pending-actions-summary.txt | Out-String) `
+  -SmtpServer "smtp.company.com"
+```
+
+**Integration Examples**:
+
+Bash (Cron jobs):
+```bash
+# Daily morning report (8 AM)
+0 8 * * * /usr/local/bin/list-rds-pending-actions.sh
+
+# Weekly summary (Monday 9 AM)
+0 9 * * 1 /usr/local/bin/list-rds-pending-actions.sh && \
+  mail -s "Weekly RDS Maintenance Report" team@company.com < /path/to/rds-pending-actions-summary.txt
+
+# Pre-maintenance window check
+./list-rds-pending-actions.sh
+# Review output before scheduling maintenance
+```
+
+PowerShell (Scheduled tasks):
+```powershell
+# Create scheduled task for daily report
+$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument "-File C:\Scripts\list-rds-pending-actions.ps1"
+$trigger = New-ScheduledTaskTrigger -Daily -At 8am
+Register-ScheduledTask -TaskName "RDS Pending Actions Report" `
+  -Action $action -Trigger $trigger
+
+# Integration with monitoring systems
+.\list-rds-pending-actions.ps1
+$csv = Import-Csv rds-pending-actions.csv
+$pendingCount = ($csv | Where-Object { $_.'Pending Maintenance' -ne 'None' }).Count
+if ($pendingCount -gt 0) {
+    Write-Warning "Found $pendingCount instances with pending maintenance"
+    # Send alert to monitoring system
+}
+```
+
+**Understanding Pending Actions**:
+
+**Pending Maintenance Actions**:
+- System updates (security patches, minor version updates)
+- Database engine version upgrades
+- Operating system maintenance
+- Certificate rotations
+- Hardware maintenance
+
+**Auto-Apply Behavior**:
+- AWS will automatically apply maintenance after the auto-apply date if not manually scheduled
+- You can schedule maintenance during your preferred maintenance window before the auto-apply date
+- Some actions can be deferred but will eventually be auto-applied
+
+**Pending Modifications**:
+- Instance class changes (scaling up/down)
+- Storage size or type changes
+- Multi-AZ configuration changes
+- Parameter group changes
+- Option group changes
+- Backup retention changes
+
+**Modification Application**:
+- Some modifications apply immediately when submitted
+- Others are pending and will apply during the next maintenance window
+- You can control timing with `--apply-immediately` flag when making changes
+
+**Best Practices**:
+1. **Review regularly**: Run this report weekly to stay informed of upcoming maintenance
+2. **Plan maintenance windows**: Schedule maintenance during low-traffic periods before auto-apply dates
+3. **Test modifications**: Apply pending modifications to non-production environments first
+4. **Monitor after changes**: Watch performance metrics after modifications are applied
+5. **Document maintenance**: Keep records of when maintenance was performed and any issues encountered
+
+**Proactive Maintenance Workflow**:
+```bash
+# 1. Generate report
+./list-rds-pending-actions.sh
+
+# 2. Review pending actions
+cat rds-pending-actions-summary.txt
+
+# 3. Schedule maintenance for instances with pending actions
+aws rds apply-pending-maintenance-action \
+  --resource-identifier arn:aws:rds:us-east-1:123456789012:db:production-db-01 \
+  --apply-action-name system-update \
+  --opt-in-type immediate  # or use specific date/time
+
+# 4. Apply pending modifications during maintenance window
+aws rds modify-db-instance \
+  --db-instance-identifier production-db-01 \
+  --apply-immediately
+```
+
+---
 
 ### Route 53 Empty Zones Cleanup
 
